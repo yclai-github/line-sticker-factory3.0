@@ -137,6 +137,8 @@
             const distThreshold = tolerance * 4.42; 
             const ramp = Math.max(1, smoothness * 5); 
 
+            // 第一階段：基礎去背與 Alpha 遮罩計算
+            const alphas = new Uint8Array(w * h);
             for (let i = 0; i < data.length; i += 4) {
                 const r = data[i];
                 const g = data[i + 1];
@@ -151,7 +153,34 @@
                         if (g > r && g > b) data[i+1] = (r + b) / 2; 
                     }
                 }
-                data[i + 3] = alpha;
+                alphas[i/4] = alpha;
+            }
+
+            // 第二階段：邊緣侵蝕優化 (移除 3px 黑邊殘留)
+            const trim = 3; 
+            const finalAlphas = new Uint8Array(alphas);
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    const idx = y * w + x;
+                    if (alphas[idx] > 0) {
+                        let shouldClear = false;
+                        for (let dy = -trim; dy <= trim; dy++) {
+                            for (let dx = -trim; dx <= trim; dx++) {
+                                const nx = x + dx; const ny = y + dy;
+                                if (nx < 0 || nx >= w || ny < 0 || ny >= h || alphas[ny * w + nx] === 0) {
+                                    shouldClear = true; break;
+                                }
+                            }
+                            if (shouldClear) break;
+                        }
+                        if (shouldClear) finalAlphas[idx] = 0;
+                    }
+                }
+            }
+
+            // 套用最終 Alpha 值
+            for (let i = 0; i < data.length; i += 4) {
+                data[i + 3] = finalAlphas[i / 4];
             }
 
             ctx.putImageData(imgData, 0, 0);
@@ -235,17 +264,17 @@
                     setFinalImages(prev => {
                         const exists = prev.find(img => img.id === id);
                         if (exists) return prev;
-                        return [...prev, { id, dataUrl }].sort((a,b) => a.id - b.id);
+                        return [...prev, { id, dataUrl, rawSource: null }].sort((a,b) => a.id - b.id);
                     });
                     setProcessedCount(prev => prev + 1);
                 };
-                return () => workerRef.current.terminate();
+                return () => { workerRef.current.terminate(); }
             }, []);
 
             useEffect(() => {
                 if (processedCount === 20 && isProcessing) {
                     setIsProcessing(false);
-                    setMainId(1); setTabId(1);
+                    setTabId(1);
                     setStep(3);
                 }
             }, [processedCount, isProcessing]);
@@ -283,7 +312,6 @@
                 return `✅ 20 格角色貼圖集｜Prompt 建議 (5 × 4)\n\n[角色與風格設定]\n角色一致性：${charDesc}\n構圖風格：畫面僅包含內容主體，不包含任何場景背景。\n畫風設定：【${style.desc}】。\n貼紙風格（去背友善）：內容外圍皆需加入 粗白色外框（Sticker Style）。背景統一為 #00FF00（純綠色），不可有雜點。\n\n[內容核心需求]\n${contentRequirement}\n嚴禁重複：這 20 張貼圖的動作、表情與文字組合必須完全獨立且不重疊，確保生成的 20 張貼圖內容完全不同。\n\n[畫面佈局與尺寸規格]\n整體為 5 × 4 佈局，共 20 張貼圖。總尺寸：2560 × 1664 px。\n強制居中：貼圖之間保留 40 px 間隔。每張小圖等比縮放填滿排列。每張貼圖四周需預留充足 Padding，確保內容不重疊且方便裁切。\n鏡頭多樣化：全身 + 半身混合，必須包含正面、側面、俯角等不同視角。\n\n[文字設計]\n字型風格：【可愛 Q 版字型，顏色鮮豔、易讀，多色彩混合，絕對禁止使用任何綠色與黑色，因為會導致去背錯誤。請改用紅、藍、紫、橘、黃等高對比色彩。】\n排版比例：單張貼圖內，文字佔比約 40%，主角佔比約 60%。文字不能遮臉,也不要使用任何emoji表情符號。\n\n[表情與動作設計]\n表情與情緒多樣性（必須包含但不限於）：【${theme.emotions}、疑惑、心碎、得意奸笑、流口水、驚恐、帥氣展現、自信滿滿、無奈嘆氣、大笑不止、生氣冒火】。\n角色動作與視角參考：例如【${theme.actions}、特寫大頭部、全身縮小蹲下、侧身回頭看、大字型張開手、縮在角落、拿著道具(如星星、愛心、包袱、計算機)】。\n20 格皆須為 不同動作與不同表情。\n\n[輸出格式]\n一張大圖，內含 5 × 4 的 20 張貼圖。背景必須為 純綠色 #00FF00。每格內容均附上粗白邊。務必確保符合上述需求。`;
             };
 
-            // Enhanced Clipboard support for iFrame environments
             const handleCopyPrompt = () => {
                 const text = getPromptText();
                 const textArea = document.createElement("textarea");
@@ -295,7 +323,7 @@
                     setCopySuccess(true);
                     setTimeout(() => setCopySuccess(false), 2000);
                 } catch (err) {
-                    console.error('Copy failed', err);
+                    console.error('複製失敗', err);
                 }
                 document.body.removeChild(textArea);
             };
@@ -308,7 +336,7 @@
                     const cols = 5; const rows = 4;
                     const canvas = document.createElement('canvas');
                     canvas.width = 2560; canvas.height = 1664;
-                    const ctx = canvas.getContext('2d');
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
                     ctx.fillStyle = targetColorHex;
                     ctx.fillRect(0,0,2560,1664);
                     
@@ -356,16 +384,34 @@
                 await Promise.all(finalImages.map(async (img, idx) => {
                     zip.file(`${(startNumber + idx).toString().padStart(2, '0')}.png`, img.dataUrl.split(',')[1], {base64:true});
                 }));
-                if (mainId) {
-                    const mainImg = finalImages.find(i => i.id === mainId);
-                    if (mainImg) zip.file("main.png", mainImg.dataUrl.split(',')[1], {base64: true});
-                }
                 if (tabId) {
                     const tabImg = finalImages.find(i => i.id === tabId);
-                    if (tabImg) zip.file("tab.png", tabImg.dataUrl.split(',')[1], {base64: true});
+                    if (tabImg) {
+                        const tabB64 = await resizeImageFromUrl(tabImg.dataUrl, 96, 74);
+                        zip.file("tab.png", tabB64, {base64: true});
+                    }
                 }
                 zip.generateAsync({type:"blob"}).then(c => saveAs(c, "line_stickers_3.0.zip"));
             };
+
+            const resizeImageFromUrl = (dataUrl, width, height) => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        const scale = Math.min(width/img.width, height/img.height);
+                        const newW = img.width * scale;
+                        const newH = img.height * scale;
+                        ctx.drawImage(img, 0, 0, img.width, img.height, (width-newW)/2, (height-newH)/2, newW, newH);
+                        resolve(canvas.toDataURL('image/png').split(',')[1]);
+                    };
+                    img.src = dataUrl;
+                });
+            };
+
+            const getFileName = (index) => (startNumber + index).toString().padStart(2, '0');
 
             const PromptDisplay = () => {
                 const theme = PROMPT_THEMES[activeTheme];
@@ -463,52 +509,47 @@
                                         <li>(1) 整體為 5欄 × 4列 佈局，共 20 張貼圖，總尺寸：<span className="text-sky-400 font-mono font-bold">2560 × 1664 px</span>。</li>
                                         <li>(2) 建議使用下方規範好的Prompt進行生圖，若發現圖片生成不符合尺寸，可以再次跟AI提出需求，請AI依據指定的像素修改。</li>
                                     </ul>
-                                    <p className="text-yellow-400 font-bold border-t border-slate-700 pt-3 mt-2">
-                                        💡 可以參考下方生圖【AI 提示詞大師】先生成圖片，再使用【Line 貼圖自動化助手】進行加工。
-                                    </p>
                                 </div>
 
-                                <div className="relative group w-full max-w-2xl mx-auto">
-                                    <div className="border-2 border-dashed border-slate-600 rounded-2xl min-h-[300px] flex flex-col items-center justify-center bg-slate-900 group-hover:border-line transition-all cursor-pointer overflow-hidden relative">
+                                <div className="relative group w-full max-w-2xl mx-auto flex flex-col items-center">
+                                    <div className="border-2 border-dashed border-slate-600 rounded-2xl flex flex-col items-center justify-center bg-slate-900 group-hover:border-line group-hover:bg-slate-800 transition-all cursor-pointer overflow-hidden relative w-full" style={{ height: originalSheet ? 'auto' : '16rem', padding: originalSheet ? '20px' : '0' }}>
                                         <input type="file" accept="image/*" onChange={handleUpload} className="absolute inset-0 opacity-0 cursor-pointer z-20" />
                                         {originalSheet ? (
-                                            <div className="relative w-full h-full p-2 flex items-center justify-center overflow-hidden">
+                                            <div className="relative overflow-hidden shadow-2xl border-2 border-slate-500/50 flex items-center justify-center w-fit h-auto max-w-full">
                                                 <div className="relative">
-                                                    <img src={originalSheet.src} style={{ 
-                                                        transform: `translate(${gridPos.x}%, ${gridPos.y}%) scale(${gridPos.scale})`,
-                                                        maxWidth: '100%', maxHeight: '400px', transition: 'transform 0.1s'
-                                                    }} />
-                                                    <div className="absolute inset-0 align-grid"></div>
+                                                    <img src={originalSheet.src} style={{ transform: `translate(${gridPos.x}%, ${gridPos.y}%) scale(${gridPos.scale})`, display: 'block', maxWidth: '100%', maxHeight: '60vh', transition: 'transform 0.1s' }} alt="Original" />
+                                                    <div className="absolute inset-0 align-grid w-full h-full z-10 opacity-70 pointer-events-none"></div>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="flex flex-col items-center">
+                                            <div className="flex flex-col items-center justify-center z-10 pointer-events-none py-10 w-full h-full">
                                                 <div className="w-16 h-16 bg-slate-800 text-line rounded-2xl flex items-center justify-center mb-4 shadow-sm border border-slate-700">
                                                     <IconUpload className="w-8 h-8" />
                                                 </div>
                                                 <span className="bg-white text-slate-900 px-6 py-2 rounded-full font-bold shadow-md">選擇檔案</span>
-                                                <span className="text-xs text-slate-500 mt-3">或是將圖片拖曳至此</span>
                                             </div>
                                         )}
                                     </div>
+                                    
+                                    {originalSheet && (
+                                        <div className="mt-4 bg-slate-900 p-4 rounded-xl border border-slate-700 space-y-4 w-full">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-xs text-slate-400"><span>水平平移 (X)</span><span>{gridPos.x}%</span></div>
+                                                    <input type="range" min="-30" max="30" step="0.5" value={gridPos.x} onChange={(e)=>setGridPos({...gridPos, x: parseFloat(e.target.value)})} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"/>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-xs text-slate-400"><span>垂直平移 (Y)</span><span>{gridPos.y}%</span></div>
+                                                    <input type="range" min="-30" max="30" step="0.5" value={gridPos.y} onChange={(e)=>setGridPos({...gridPos, y: parseFloat(e.target.value)})} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"/>
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between text-xs text-slate-400"><span>縮放尺寸</span><span>{Math.round(gridPos.scale*100)}%</span></div>
+                                                    <input type="range" min="0.5" max="1.5" step="0.01" value={gridPos.scale} onChange={(e)=>setGridPos({...gridPos, scale: parseFloat(e.target.value)})} className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"/>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-
-                                {originalSheet && (
-                                    <div className="mt-6 bg-slate-900 p-6 rounded-2xl border border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-xs text-slate-400"><span><IconMove className="w-3 h-3 inline mr-1"/>水平平移</span><span>{gridPos.x}%</span></div>
-                                            <input type="range" min="-50" max="50" value={gridPos.x} onChange={(e)=>setGridPos({...gridPos, x: parseInt(e.target.value)})} className="w-full" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-xs text-slate-400"><span><IconMove className="w-3 h-3 inline mr-1 rotate-90"/>垂直平移</span><span>{gridPos.y}%</span></div>
-                                            <input type="range" min="-50" max="50" value={gridPos.y} onChange={(e)=>setGridPos({...gridPos, y: parseInt(e.target.value)})} className="w-full" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-xs text-slate-400"><span><IconCrop className="w-3 h-3 inline mr-1"/>縮放倍率</span><span>{Math.round(gridPos.scale*100)}%</span></div>
-                                            <input type="range" min="0.5" max="1.5" step="0.01" value={gridPos.scale} onChange={(e)=>setGridPos({...gridPos, scale: parseFloat(e.target.value)})} className="w-full" />
-                                        </div>
-                                    </div>
-                                )}
 
                                 {originalSheet && (
                                     <button onClick={performSlice} className="mt-8 bg-line hover:bg-green-600 text-white px-12 py-4 rounded-xl font-bold shadow-lg transition-all btn-press flex items-center justify-center gap-3 mx-auto text-lg">
@@ -517,27 +558,24 @@
                                 )}
                             </div>
 
-                            <div className="lg:col-span-2 bg-slate-800/80 p-6 rounded-3xl border border-slate-700 h-fit space-y-6 text-slate-300">
+                            <div className="lg:col-span-2 bg-slate-800/80 p-6 rounded-3xl border border-slate-700 h-fit space-y-6 text-slate-300 text-sm">
                                 <h3 className="text-xl font-bold text-white mb-4 border-b border-slate-600 pb-3">【貼圖自動化助手 步驟說明】</h3>
-                                <div className="space-y-4">
+                                <div className="space-y-4 leading-relaxed">
                                     <div>
-                                        <div className="font-bold text-line text-lg mb-1">Step 1：先把你的貼圖「生」出來！</div>
-                                        <p className="text-sm leading-relaxed text-slate-400">還沒有圖片？完全沒問題～<br/>直接使用下方 Meiko幫大家設計的【AI 提示詞大師】，挑選適合的prompt後，生成圖片(Prompt內橘色文字都是可以修改的)。加點你的創意調味，用 Gemini Nano Banana Pro / ChatGPT ...等AI工具 就能生成超可愛貼圖素材！</p>
+                                        <div className="font-bold text-line text-lg mb-1 text-base">Step 1：先把你的貼圖「生」出來！</div>
+                                        <p>使用下方【AI 提示詞大師】，挑選適合的prompt後生成圖片。加點你的創意調味，用 Gemini Nano Banana Pro / ChatGPT 就能生成超可愛貼圖素材！</p>
                                     </div>
                                     <div>
-                                        <div className="font-bold text-line text-lg mb-1">Step 2：用《LINE貼圖自動化助手》一鍵搞定切圖＋去背！</div>
-                                        <p className="text-sm text-slate-400">下載前記得先做兩件小事：</p>
-                                        <ul className="list-none pl-0 mt-1 space-y-2 text-xs text-slate-300">
-                                            <li className="bg-slate-900 p-3 rounded-lg border border-slate-700"><span className="font-bold text-white">① 選擇 main / tab 封面圖</span><br/>挑一張最能代表你角色靈魂的封面圖，按一下「Main 和 tab按鈕（建議使用同一張貼圖）」就設定完成，下載時可以一併下載下來。</li>
-                                            <li className="bg-slate-900 p-3 rounded-lg border border-slate-700"><span className="font-bold text-white">② 設定檔名起始編號</span><br/>如果你正在生產第二組貼圖，把起始編號改成 21，這樣下載後全部 貼圖（含 main、tab）會乖乖排好隊，輕鬆彙整進同一個壓縮檔，完全不會撞號 ✨</li>
+                                        <div className="font-bold text-line text-lg mb-1 text-base">Step 2：一鍵搞定切圖＋去背！</div>
+                                        <p className="mb-2">貼心小提醒：</p>
+                                        <ul className="list-disc pl-5 space-y-1">
+                                            <li>3.0 版去背會自動執行 <span className="text-white font-bold">3px 邊緣清理</span>，有效移除黑邊殘留。</li>
+                                            <li>如果對位不準，請利用網格拉桿微調 X/Y 與縮放。</li>
                                         </ul>
                                     </div>
                                     <div>
-                                        <div className="font-bold text-line text-lg mb-1">Step 3：到 LINE Creators Market 一鍵上傳！</div>
-                                        <p className="text-sm text-slate-400">打開 <a href="https://creator.line.me/zh-hant/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline font-bold">Line Creators Market</a>，整包壓縮檔直接上傳～</p>
-                                        <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-700">
-                                            提醒：完成分割去背後的貼圖，也可以放在其他社群工具內使用，例如：IG、Messenger、WhatsAPP、Telegram、Discord.....等等。
-                                        </p>
+                                        <div className="font-bold text-line text-lg mb-1 text-base">Step 3：到 LINE Creators Market 一鍵上傳！</div>
+                                        <p>下載整包壓縮檔即可直接上傳～</p>
                                     </div>
                                 </div>
                             </div>
@@ -572,14 +610,8 @@
                                                 <button onClick={()=>setCharMode('custom')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all border ${charMode === 'custom' ? 'bg-blue-600 border-blue-500 text-white shadow-md' : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500'}`}>自訂角色</button>
                                             </div>
                                             {charMode === 'custom' && (
-                                                <div className="w-full max-w-2xl">
-                                                    <input 
-                                                        type="text" 
-                                                        placeholder="範例：一隻穿著夏威夷衫的柴犬、或是戴著皇冠的貓咪、穿著太空衣正在喝珍奶的機器人" 
-                                                        value={customChar} 
-                                                        onChange={(e)=>setCustomChar(e.target.value)} 
-                                                        className="w-full bg-slate-800 border border-slate-600 p-3 rounded-lg text-white text-sm focus:outline-none focus:border-line shadow-inner" 
-                                                    />
+                                                <div className="w-full max-w-2xl animate-fade-in">
+                                                    <input type="text" placeholder="範例：一隻穿著太空衣正在喝珍奶的機器人、或戴著皇冠的貓咪" value={customChar} onChange={(e)=>setCustomChar(e.target.value)} className="w-full bg-slate-800 border border-slate-600 p-3 rounded-lg text-white text-sm focus:outline-none focus:border-line shadow-inner" />
                                                 </div>
                                             )}
                                         </div>
@@ -598,9 +630,7 @@
                                         <span className="ui-header-label">4. 選擇畫風：</span>
                                         <div className="flex gap-2 flex-wrap">
                                             {Object.entries(PROMPT_STYLES).map(([key, style]) => (
-                                                <button key={key} onClick={() => setActiveStyle(key)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${activeStyle === key ? 'bg-purple-600 text-white border-purple-500 shadow-md' : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500'}`}>
-                                                    {style.label}
-                                                </button>
+                                                <button key={key} onClick={() => setActiveStyle(key)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${activeStyle === key ? 'bg-purple-600 text-white border-purple-500 shadow-md' : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500'}`}>{style.label}</button>
                                             ))}
                                         </div>
                                     </div>
@@ -624,25 +654,28 @@
                                 </div>
                             ))}
                         </div>
-                        <div className="flex justify-center gap-4 pt-8 border-t border-slate-700 mt-6">
-                            <button onClick={()=>setStep(1)} className="px-6 py-3 rounded-xl font-bold text-slate-400 bg-slate-900 hover:bg-slate-700 hover:text-white transition">重新上傳</button>
-                            <button onClick={performProcessing} disabled={isProcessing} className="bg-line hover:bg-green-600 text-white px-12 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 transition-all btn-press flex items-center justify-center gap-2 min-w-[240px]">
-                                {isProcessing ? <><IconLoader /><span>處理中 ({processedCount}/20)</span></> : <><IconEraser />執行去背處理</>}
-                            </button>
+                        <div className="flex justify-center gap-4 pt-8 border-t border-slate-700 mt-6 text-center">
+                            <p className="text-slate-400 text-sm mb-4 block w-full">💡 去背時將自動執行 3px 侵蝕處理，確保無黑邊殘留。</p>
+                            <div className="flex gap-4 w-full justify-center">
+                                <button onClick={()=>setStep(1)} className="px-6 py-3 rounded-xl font-bold text-slate-400 bg-slate-900 hover:bg-slate-700 hover:text-white transition">重新上傳</button>
+                                <button onClick={performProcessing} disabled={isProcessing} className="bg-line hover:bg-green-600 text-white px-12 py-3 rounded-xl font-bold shadow-lg shadow-green-900/20 transition-all btn-press flex items-center justify-center gap-2 min-w-[240px]">
+                                    {isProcessing ? <><IconLoader /><span>處理中 ({processedCount}/20)</span></> : <><IconEraser />執行去背處理</>}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <div className={`step-card bg-slate-800 rounded-3xl shadow-lg border border-slate-700 p-8 mb-8 ${step !== 3 && 'hidden'}`}>
                          <div className="mb-8 border-b border-slate-700 pb-6">
-                            <h2 className="text-2xl font-bold text-white flex items-center gap-2 mb-2"><IconCheckCircle className="text-line"/>設定與打包下載</h2>
+                            <h2 className="text-2xl font-bold text-white flex items-center gap-2 mb-2"><IconCheckCircle className="text-line"/> 設定與打包下載</h2>
                         </div>
                         
                         <div className="flex flex-col xl:flex-row gap-6 items-end mb-8">
                             <div className="w-full xl:flex-1 bg-yellow-500/10 border border-yellow-500/30 p-5 rounded-xl text-yellow-200">
                                 <div className="font-bold flex items-center gap-2 mb-2 text-yellow-400"><IconInfo className="w-5 h-5"/> 下載前注意事項：</div>
                                 <ul className="list-disc pl-6 space-y-1 opacity-90 text-sm">
-                                    <li>選擇 <span className="font-bold text-white">main / tab 封面圖</span>：點擊貼圖下方的按鈕設定封面與標籤圖。</li>
-                                    <li>設定 <span className="font-bold text-white font-mono">起始編號</span>：若生第二組貼圖，可改為 21，方便後續管理。</li>
+                                    <li>選擇 <span className="font-bold text-white">tab 封面圖</span>：點擊貼圖下方的按鈕設定表情貼標籤圖。</li>
+                                    <li>設定 <span className="font-bold text-white font-mono">起始編號</span>：如生第二組，可改為 21。</li>
                                 </ul>
                             </div>
                             
@@ -655,14 +688,14 @@
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-10 gap-4">
+                        {/* 修改為 5x4 Grid 佈置，並加大檢視畫面 */}
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                             {finalImages.map((img, idx) => (
-                                <div key={img.id} className="bg-slate-900 rounded-2xl border border-slate-700 p-2 hover:border-green-500 transition-all">
-                                    <div className="aspect-square grid-bg rounded-xl flex items-center justify-center overflow-hidden border border-slate-700 mb-2"><img src={img.dataUrl} className="w-full h-full object-contain" /></div>
-                                    <div className="text-center text-[10px] font-bold text-slate-500 mb-3 bg-slate-800 rounded py-1 font-mono">{ (startNumber+idx).toString().padStart(2,'0') }.png</div>
+                                <div key={img.id} className="bg-slate-900 rounded-2xl border border-slate-700 p-4 hover:border-green-500 transition-all shadow-md group">
+                                    <div className="aspect-square grid-bg rounded-xl flex items-center justify-center overflow-hidden border border-slate-700 mb-3"><img src={img.dataUrl} className="w-full h-full object-contain scale-95 group-hover:scale-100 transition-transform" /></div>
+                                    <div className="text-center text-xs font-bold text-slate-500 mb-3 bg-slate-800 rounded py-1 font-mono">{ getFileName(idx) }.png</div>
                                     <div className="space-y-1">
-                                        <button onClick={() => setMainId(img.id)} className={`w-full text-[10px] py-1 rounded transition-all flex items-center justify-center gap-1 ${mainId === img.id ? 'bg-line text-white font-bold' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}><IconStar className="w-2 h-2" /> Main</button>
-                                        <button onClick={() => setTabId(img.id)} className={`w-full text-[10px] py-1 rounded transition-all flex items-center justify-center gap-1 ${tabId === img.id ? 'bg-line text-white font-bold' : 'bg-slate-800 text-slate-500 hover:bg-slate-700'}`}><IconTag className="w-2 h-2" /> Tab</button>
+                                        <button onClick={() => setTabId(img.id)} className={`w-full py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-xs ${tabId === img.id ? 'bg-line text-white font-bold shadow-lg' : 'bg-slate-800 text-slate-500 hover:bg-slate-700 border border-slate-700'}`}><IconTag className="w-3 h-3" /> 設定為 Tab 圖</button>
                                     </div>
                                 </div>
                             ))}
@@ -684,7 +717,6 @@
                             <div className="text-sm max-w-2xl mx-auto opacity-80 leading-relaxed">
                                 歡迎前往 <span className="text-line font-bold">【Meiko微課頻道】</span> 學習更多 AI 應用、Excel 技術、Power Query 實戰技巧。
                             </div>
-                            <div className="text-sm">聯繫信箱：<a href="mailto:meikoedux@gmail.com" className="hover:text-white transition-colors">meikoedux@gmail.com</a></div>
                         </div>
                     </footer>
                 </div>
