@@ -181,20 +181,20 @@
         };
 
         const PROMPT_STYLES = {
-            qversion: { label: '插畫風：可愛 Q 版', desc: '可愛、活潑、2D 平面貼紙風格' },
-            threed_figure: { label: '插畫風：3D 公仔', desc: '3D 公仔風格、圓潤、具備光影與材質感' },
-            flat_illu: { label: '插畫風：扁平插畫', desc: '扁平化設計、線條簡潔、Flat Illustration' },
-            children_book: { label: '插畫風：童書繪本', desc: '溫馨童書繪本風格、柔和色調、充滿想像力' },
-            hand_drawn: { label: '插畫風：童趣手繪', desc: '蠟筆手繪感、線條不規則、充滿童趣' },
-            chibi: { label: '插畫風：日系 Chibi', desc: '日系 Chibi Style、大頭小身體、賽璐璐風格' },
-            watercolor: { label: '藝術風：清新水彩', desc: '清新藝術水彩、渲染效果、Watercolor Style' },
-            ink: { label: '藝術風：古風水墨', desc: '古風水墨風格、毛筆筆觸、留白意境' },
-            pixel: { label: '動畫/遊戲：復古像素', desc: '8-bit 復古像素風、Pixel Art' },
-            ghibli: { label: '動畫/遊戲：吉卜力風', desc: '吉卜力風格、大氣氛圍、清新色調' },
-            rpg_card: { label: '動畫/遊戲：RPG 卡牌', desc: 'RPG 遊戲卡牌風格、華麗精緻、具備角色框架感' },
-            realistic: { label: '攝影風：寫實攝影', desc: '寫實攝影風格、精確的光影與細節呈現' },
-            isometric: { label: '設計風：等距視角', desc: '等距視角、立體幾何感、Isometric Style' },
-            minimalist: { label: '設計風：扁平圖示', desc: '極簡圖示風格、Minimal UI Style' }
+            qversion: { label: '可愛 Q 版', desc: '可愛、活潑、2D 平面貼紙風格' },
+            threed_figure: { label: '3D 公仔', desc: '3D 公仔風格、圓潤、具備光影與材質感' },
+            flat_illu: { label: '扁平插畫', desc: '扁平化設計、線條簡潔、Flat Illustration' },
+            children_book: { label: '童書繪本', desc: '溫馨童書繪本風格、柔和色調、充滿想像力' },
+            hand_drawn: { label: '童趣手繪', desc: '手繪感、線條不規則、充滿童趣' },
+            chibi: { label: '日系 Chibi', desc: '日系 Chibi Style、大頭小身體、賽璐璐風格' },
+            watercolor: { label: '清新水彩', desc: '清新藝術水彩、渲染效果、Watercolor Style' },
+            ink: { label: '古風水墨', desc: '古風水墨風格、毛筆筆觸、留白意境' },
+            pixel: { label: '復古像素', desc: '8-bit 復古像素風、Pixel Art' },
+            ghibli: { label: '吉卜力風', desc: '吉卜力風格、大氣氛圍、清新色調' },
+            rpg_card: { label: 'RPG 卡牌', desc: 'RPG 遊戲卡牌風格、華麗精緻、具備角色框架感' },
+            realistic: { label: '寫實攝影', desc: '寫實攝影風格、精確的光影與細節呈現' },
+            isometric: { label: '等距視角', desc: '等距視角、立體幾何感、Isometric Style' },
+            minimalist: { label: '扁平圖示', desc: '極簡圖示風格、Minimal UI Style' }
         };
 
         const PROMPT_MODES = [
@@ -280,7 +280,7 @@
                     contentRequirement = `每一格僅包含「繁體中文純文字大字藝術字體」，不包含角色人物，但可配上與文字相關的簡單點綴符號。文字內容：【${theme.texts}】。`;
                 }
 
-                return `✅ 20 格角色貼圖集｜Prompt 建議 (5 × 4)\n\n[角色與風格設定]\n角色一致性：${charMode === 'custom' ? customChar : '必須完全維持原圖主角的髮型、服裝、五官與整體外觀特徵。'}\n構圖風格：畫面僅包含主體內容，不包含任何場景背景。\n畫風設定：【${style.desc}】。\n貼紙風格（去背友善）：內容外圍皆需加入 粗白色外框（Sticker Style）。背景統一為 #00FF00（純綠色），不可有雜點。\n\n[內容核心需求]\n${contentRequirement}\n\n[畫面佈局與尺寸規格]\n整體為 5 × 4 佈局，共 20 張貼圖。總尺寸：2560 × 1664 px。\n每張小圖約 512 × 416 px（自動等比縮放填滿排列）。每張貼圖四周預留約 0.2 cm Padding，避免畫面互相黏住。\n鏡頭多樣化：全身 + 半身混合，必須包含正面、側面、俯角等不同視角。\n\n[文字設計]\n字型風格：【可愛 Q 版字型，顏色鮮豔、易讀，多色彩混合，絕對禁止使用任何綠色與黑色，因為會導致去背錯誤。請改用紅、藍、紫、橘、黃等高對比色彩。】\n排版：文字大小約佔單張貼圖 1/3，不能遮臉,也不要使用任何emoji表情符號。\n\n[表情與動作設計]\n表情與情緒多樣性（必須包含但不限於）：【${theme.emotions}、疑惑、心碎、得意奸笑、流口水、驚恐、帥氣展現、自信滿滿、無奈嘆氣、大笑不止、生氣冒火】。\n角色動作與視角參考：例如【${theme.actions}、特寫大頭部、全身縮小蹲下、侧身回頭看、大字型張開手、縮在角落、拿著道具(如星星、愛心、包袱、計算機)】。\n20 格皆須為 不同動作與不同表情。\n\n[輸出格式]\n一張大圖，內含 5 × 4 的 20 張貼圖。背景必須為 純綠色 #00FF00。每格內容均附上粗白邊。務必確保符合上述需求。`;
+                return `✅ 20 格角色貼圖集｜Prompt 建議 (5 × 4)\n\n[角色與風格設定]\n角色一致性：${charDesc}\n構圖風格：畫面僅包含內容主體，不包含任何場景背景。\n畫風設定：【${style.desc}】。\n貼紙風格（去背友善）：內容外圍皆需加入 粗白色外框（Sticker Style）。背景統一為 #00FF00（純綠色），不可有雜點。\n\n[內容核心需求]\n${contentRequirement}\n嚴禁重複：這 20 張貼圖的動作、表情與文字組合必須完全獨立且不重疊，確保生成的 20 張貼圖內容完全不同。\n\n[畫面佈局與尺寸規格]\n整體為 5 × 4 佈局，共 20 張貼圖。總尺寸：2560 × 1664 px。\n強制居中：貼圖之間保留 40 px 間隔。每張小圖等比縮放填滿排列。每張貼圖四周需預留充足 Padding，確保內容不重疊且方便裁切。\n鏡頭多樣化：全身 + 半身混合，必須包含正面、側面、俯角等不同視角。\n\n[文字設計]\n字型風格：【可愛 Q 版字型，顏色鮮豔、易讀，多色彩混合，絕對禁止使用任何綠色與黑色，因為會導致去背錯誤。請改用紅、藍、紫、橘、黃等高對比色彩。】\n排版比例：單張貼圖內，文字佔比約 40%，主角佔比約 60%。文字不能遮臉,也不要使用任何emoji表情符號。\n\n[表情與動作設計]\n表情與情緒多樣性（必須包含但不限於）：【${theme.emotions}、疑惑、心碎、得意奸笑、流口水、驚恐、帥氣展現、自信滿滿、無奈嘆氣、大笑不止、生氣冒火】。\n角色動作與視角參考：例如【${theme.actions}、特寫大頭部、全身縮小蹲下、侧身回頭看、大字型張開手、縮在角落、拿著道具(如星星、愛心、包袱、計算機)】。\n20 格皆須為 不同動作與不同表情。\n\n[輸出格式]\n一張大圖，內含 5 × 4 的 20 張貼圖。背景必須為 純綠色 #00FF00。每格內容均附上粗白邊。務必確保符合上述需求。`;
             };
 
             // Enhanced Clipboard support for iFrame environments
@@ -379,7 +379,8 @@
                         <ul>
                             <li>內容模式：<span className="var-highlight">【{PROMPT_MODES.find(m => m.id === promptMode)?.label}】</span></li>
                             <li>角色來源：<span className="var-highlight">【{charMode === 'upload' ? '參考上傳圖片' : '自訂角色'}】</span></li>
-                            <li>角色一致性：{charMode === 'custom' ? customChar : '必須完全維持原圖主角的髮型、服裝、五官與整體外觀特徵。'}</li>
+                            <li>角色一致性：{charMode === 'custom' ? <span className="var-highlight">{customChar}</span> : '必須完全維持原圖主角的髮型、服裝、五官與整體外觀特徵。'}</li>
+                            <li>嚴禁重複：<span className="var-highlight">這 20 張貼圖的動作、表情與文字組合必須完全獨立且不重複。</span></li>
                         </ul>
 
                         <h2>[角色與風格設定]</h2>
@@ -391,6 +392,7 @@
                         <h2>[畫面佈局與尺寸規格]</h2>
                         <ul>
                             <li>整體為 5 × 4 佈局，共 20 張貼圖。總尺寸：<span className="fixed-val">2560 × 1664 px</span>。</li>
+                            <li>強制居中：<span className="var-highlight">貼圖之間保留 40 px 間隔</span>。</li>
                         </ul>
                         
                         {promptMode !== 'char_only' && (
@@ -399,6 +401,7 @@
                                 <ul>
                                     <li>語言：<span className="var-highlight">【台灣繁體中文】</span></li>
                                     <li>文字內容：<span className="var-highlight">【{theme.texts}】</span></li>
+                                    <li>排版比例：<span className="var-highlight">單張貼圖內，文字佔比約 40%，主角佔比約 60%。</span></li>
                                     <li>字型風格：【可愛 Q 版字型，顏色鮮豔、易讀，多色彩混合，絕對禁止使用任何綠色與黑色。】</li>
                                 </ul>
                             </>
@@ -596,7 +599,7 @@
                                         <div className="flex gap-2 flex-wrap">
                                             {Object.entries(PROMPT_STYLES).map(([key, style]) => (
                                                 <button key={key} onClick={() => setActiveStyle(key)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${activeStyle === key ? 'bg-purple-600 text-white border-purple-500 shadow-md' : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500'}`}>
-                                                    {style.label.split('：')[1] || style.label}
+                                                    {style.label}
                                                 </button>
                                             ))}
                                         </div>
